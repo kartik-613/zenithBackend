@@ -53,7 +53,12 @@ const seedData = async () => {
             age: 27,
             address: 'Vijay Nagar, Indore',
             bio: 'IT professional and fitness enthusiast.',
-            image: 'https://i.pinimg.com/1200x/fb/a6/4b/fba64b5c2a843b3f68d5cf04e4e9913b.jpg'
+            image: 'https://i.pinimg.com/1200x/fb/a6/4b/fba64b5c2a843b3f68d5cf04e4e9913b.jpg',
+            height: '175',
+            weight: '70',
+            bloodGroup: 'B+',
+            emergencyContact: '+91 98765 43211',
+            emergencyName: 'Priya Sharma'
         });
 
         const patient2 = await User.create({
@@ -66,7 +71,7 @@ const seedData = async () => {
             age: 31,
             address: 'Palasia, Indore',
             bio: 'Marketing executive, yoga lover.',
-            image: 'https://i.pinimg.com/736x/24/0f/10/240f10fc470a4830af234d1fdf2ba6ed.jpg'
+            image: 'https://i.pinimg.com/736x/c4/ee/1e/c4ee1e8a63ad02db5faf5827d4fcc083.jpg'
         });
 
         const patient3 = await User.create({
@@ -80,6 +85,32 @@ const seedData = async () => {
             address: 'Bhawarkua, Indore',
             bio: 'Small business owner.',
             image: 'https://i.pinimg.com/736x/34/a7/9f/34a79ffb957216f5ab1fde3a760a903b.jpg'
+        });
+
+        const patient4 = await User.create({
+            _id: '697ed7dee139a53fec9308e7',
+            name: 'Vikram Singh',
+            role: 'patient',
+            email: 'vikram.singh@gmail.com',
+            phone: '+91 66666 55555',
+            gender: 'Male',
+            age: 50,
+            address: 'Rau, Indore',
+            bio: 'Retired army officer.',
+            image: 'https://randomuser.me/api/portraits/men/32.jpg'
+        });
+
+        const patient5 = await User.create({
+            _id: '697ed7dee139a53fec9308e9',
+            name: 'Anjali Desai',
+            role: 'patient',
+            email: 'anjali.desai@gmail.com',
+            phone: '+91 55555 44444',
+            gender: 'Female',
+            age: 29,
+            address: 'Saket, Indore',
+            bio: 'Teacher.',
+            image: 'https://randomuser.me/api/portraits/women/44.jpg'
         });
 
         // ================= APPOINTMENTS =================
@@ -119,6 +150,24 @@ const seedData = async () => {
                 time: '9:00 AM',
                 type: 'Online Consultation',
                 status: 'completed',
+                mode: 'online'
+            },
+            {
+                patientId: patient4._id,
+                doctorId: doctor._id,
+                date: 'Feb 10, 2026',
+                time: '04:00 PM',
+                type: 'Back Pain',
+                status: 'upcoming',
+                mode: 'in-person'
+            },
+            {
+                patientId: patient5._id,
+                doctorId: doctor._id,
+                date: 'Feb 12, 2026',
+                time: '11:30 AM',
+                type: 'Migraine',
+                status: 'upcoming',
                 mode: 'online'
             }
         ]);

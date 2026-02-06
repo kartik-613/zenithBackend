@@ -18,8 +18,18 @@ app.use("/api", mainRoutes);
 // Test route to verify server is alive
 app.get("/ping", (req, res) => res.send("pong"));
 
+const os = require('os');
 connectDB();
 app.listen(port, "0.0.0.0", () => {
-  console.log(`Server is running at http://0.0.0.0:${port}`);
-  console.log(`Mobile access: http://10.30.79.203:${port}`);
+  const interfaces = os.networkInterfaces();
+  let localIp = 'localhost';
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        localIp = iface.address;
+      }
+    }
+  }
+  console.log(`Server is running at http://localhost:${port}`);
+  console.log(`Mobile access: http://${localIp}:${port}`);
 });

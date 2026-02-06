@@ -10,12 +10,17 @@ const MedicalPrescription = require('../models/MedicalPrescription');
 // @route   GET /api/patient/dashboard/:id
 exports.getPatientDashboard = async (req, res) => {
     try {
-        const patient = await User.findById(req.params.id);
-        if (!patient) return res.status(404).json({ message: 'Patient not found' });
+        const [patient, upcoming] = await Promise.all([
+            User.findById(req.params.id),
+            Appointment.findOne({
+                patientId: req.params.id,
+                status: { $in: ['upcoming', 'scheduled', 'today'] }
+            })
+                .populate('doctorId', 'name specialization rating reviews image')
+                .sort({ date: 1, time: 1 })
+        ]);
 
-        const upcoming = await Appointment.findOne({ patientId: req.params.id, status: 'upcoming' })
-            .populate('doctorId', 'name specialization rating reviews image')
-            .sort({ date: 1, time: 1 }); // Next scheduled
+        if (!patient) return res.status(404).json({ message: 'Patient not found' });
 
         res.json({
             patientName: patient.name,
@@ -147,10 +152,17 @@ exports.getPatientProfile = async (req, res) => {
 // @route   PUT /api/patient/profile/:id
 exports.updatePatientProfile = async (req, res) => {
     try {
-        const { name, email, phone, gender, age, address, bio, image } = req.body;
+        const { name, email, phone, gender, age, address, bio, image, height, weight, bloodGroup, emergencyContact, emergencyName, dob } = req.body;
+
+        // Handle mapping dateOfBirth from frontend to age or dob if we add it
+        const updateData = {
+            name, email, phone, gender, age, address, bio, image,
+            height, weight, bloodGroup, emergencyContact, emergencyName
+        };
+
         const patient = await User.findByIdAndUpdate(
             req.params.id,
-            { name, email, phone, gender, age, address, bio, image },
+            updateData,
             { new: true, runValidators: true }
         );
         if (!patient) return res.status(404).json({ message: 'Patient not found' });
@@ -241,6 +253,29 @@ exports.addPatientVital = async (req, res) => {
     }
 };
 
+// @desc    Reschedule Appointment
+// @route   PUT /api/patient/reschedule/:id
+exports.rescheduleAppointment = async (req, res) => {
+    try {
+        console.log('Rescheduling appointment ID:', req.params.id);
+        console.log('Request body:', req.body);
+        const { date, time, reason } = req.body;
+        const appointment = await Appointment.findByIdAndUpdate(
+            req.params.id,
+            { date, time, status: 'upcoming' }, // Standardize on 'upcoming'
+            { new: true }
+        );
+        if (!appointment) {
+            console.log('Appointment not found for ID:', req.params.id);
+            return res.status(404).json({ message: 'Appointment not found' });
+        }
+        res.json(appointment);
+    } catch (error) {
+        console.error('Error in rescheduleAppointment:', error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
 // --- NEW APIS ---
 
 // @desc    Get Patient Prescriptions
@@ -253,12 +288,13 @@ exports.getPatientPrescriptions = async (req, res) => {
 
         const formatted = prescriptions.map(p => ({
             id: p._id,
+            _id: p._id,
             date: p.date,
-            doctor: p.doctorId.name,
+            doctorName: p.doctorId?.name || 'Dr. Mehta',
+            doctor: p.doctorId?.name,
             diagnosis: p.diagnosis,
-            medicines: p.medicines.length,
-            status: p.status,
-            details: p.medicines // Including details for View
+            medicines: p.medicines,
+            status: p.status
         }));
 
         res.json(formatted);
@@ -298,20 +334,75 @@ exports.getPatientDocuments = async (req, res) => {
     }
 };
 
+// @desc    Upload Document
+// @route   POST /api/patient/documents/:id
+exports.uploadDocument = async (req, res) => {
+    try {
+        const { name, type, size, date, fileUrl, extension } = req.body;
+        const document = await Document.create({
+            patientId: req.params.id,
+            name,
+            type,
+            size: size || '1.2 MB',
+            date: date || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            fileUrl: fileUrl || 'https://example.com/mock-file.pdf',
+            extension: extension || 'PDF'
+        });
+
+        const colors = type === 'Lab Report' ? ['#EF4444', '#DB2777'] : ['#3B82F6', '#9333EA'];
+
+        res.status(201).json({
+            id: document._id,
+            title: document.name,
+            type: document.type,
+            doctorName: 'Self Uploaded',
+            date: document.date,
+            fileSize: document.size,
+            color: colors
+        });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 // @desc    Add New Patient (Register)
 // @route   POST /api/patient/register
 exports.registerPatient = async (req, res) => {
     try {
-        const { name, age, gender, phone, email, condition } = req.body;
+        const { name, age, gender, phone, email, condition, image, mode } = req.body;
+
+        // Default avatars if not provided
+        let patientImage = image;
+        if (!patientImage) {
+            patientImage = gender === 'Female'
+                ? 'https://i.pinimg.com/736x/c4/ee/1e/c4ee1e8a63ad02db5faf5827d4fcc083.jpg'
+                : 'https://i.pinimg.com/1200x/fb/a6/4b/fba64b5c2a843b3f68d5cf04e4e9913b.jpg';
+        }
+
         // Basic user creation
         const patient = await User.create({
             name,
             role: 'patient',
-            email, // Optional check if needed
-            image: 'https://images.unsplash.com/photo-1755189118414-14c8dacdb082?w=100&h=100&fit=crop' // Default
+            email,
+            age,
+            gender,
+            phone,
+            condition,
+            image: patientImage
         });
 
-        // Could also add initial "New patient" appointment request or record here
+        // If condition/mode provided, create an initial "today" appointment
+        if (condition && mode) {
+            await Appointment.create({
+                patientId: patient._id,
+                doctorId: req.body.doctorId || '697ed7dee139a53fec9308df', // Default doctor if not sent
+                date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+                type: condition,
+                status: 'today',
+                mode: mode.toLowerCase().includes('video') ? 'online' : 'in-person'
+            });
+        }
 
         res.status(201).json(patient);
     } catch (error) {

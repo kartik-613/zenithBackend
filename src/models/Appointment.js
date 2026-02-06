@@ -13,4 +13,10 @@ const appointmentSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
+// Indexes for performance
+appointmentSchema.index({ patientId: 1 });
+appointmentSchema.index({ doctorId: 1 });
+appointmentSchema.index({ status: 1 });
+appointmentSchema.index({ doctorId: 1, status: 1 }); // Compond for dashboard queries
+
 module.exports = mongoose.model('Appointment', appointmentSchema);

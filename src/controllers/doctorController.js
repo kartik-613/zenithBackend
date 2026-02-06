@@ -10,17 +10,13 @@ const MedicalPrescription = require('../models/MedicalPrescription');
 // @route   GET /api/doctor/dashboard/:id
 exports.getDoctorDashboard = async (req, res) => {
     try {
-        const doctor = await User.findById(req.params.id);
+        const [doctor, todayAppointments, upcoming] = await Promise.all([
+            User.findById(req.params.id),
+            Appointment.find({ doctorId: req.params.id, status: 'today' }).populate('patientId', 'name image gender age'),
+            Appointment.findOne({ doctorId: req.params.id, status: 'upcoming' }).sort({ date: 1, time: 1 }).populate('patientId', 'name image age gender')
+        ]);
+
         if (!doctor) return res.status(404).json({ message: 'Doctor not found' });
-
-        // Today's Appointments (Checked In)
-        const todayAppointments = await Appointment.find({ doctorId: req.params.id, status: 'today' })
-            .populate('patientId', 'name image');
-
-        // Next Upcoming Appointment
-        const upcoming = await Appointment.findOne({ doctorId: req.params.id, status: 'upcoming' })
-            .sort({ date: 1, time: 1 }) // Closest first
-            .populate('patientId', 'name image age');
 
         // Stats
         const stats = {
@@ -32,6 +28,7 @@ exports.getDoctorDashboard = async (req, res) => {
             id: app.patientId._id,
             name: app.patientId.name,
             image: app.patientId.image,
+            gender: app.patientId.gender,
             case: app.type,
             status: 'checked-in',
             waitTime: '10 min',
@@ -56,6 +53,7 @@ exports.getDoctorDashboard = async (req, res) => {
             upcomingAppointment: upcoming ? {
                 patientName: upcoming.patientId.name,
                 patientImage: upcoming.patientId.image,
+                patientGender: upcoming.patientId.gender,
                 time: upcoming.time,
                 date: upcoming.date,
                 type: upcoming.type,
@@ -86,6 +84,7 @@ exports.getDoctorAppointments = async (req, res) => {
 
         const formatted = appointments.map(a => ({
             id: a._id,
+            patientId: a.patientId._id,
             patientName: a.patientId.name,
             patientImage: a.patientId.image,
             time: a.time,
@@ -118,7 +117,7 @@ exports.getDoctorPatients = async (req, res) => {
             name: p.name,
             age: p.age || (25 + (idx % 20)),
             lastVisit: 'Feb 1, 2026',
-            condition: idx % 2 === 0 ? 'Fever & Cold' : 'Regular Checkup',
+            condition: p.condition || (idx % 2 === 0 ? 'Fever & Cold' : 'Regular Checkup'),
             image: p.image,
             status: statuses[idx % statuses.length],
             category: categories[idx % categories.length]
@@ -172,11 +171,11 @@ exports.getDoctorProfile = async (req, res) => {
 // @route   PUT /api/doctor/profile/:id
 exports.updateDoctorProfile = async (req, res) => {
     try {
-        const { name, email, phone, gender, age, address, bio, image, specialization, hospital, experience, isAvailable } = req.body;
+        const { name, email, phone, gender, age, address, bio, image, specialization, hospital, experience, isAvailable, qualification, consultationFee, registrationNumber, languages } = req.body;
 
         const doctor = await User.findByIdAndUpdate(
             req.params.id,
-            { name, email, phone, gender, age, address, bio, image, specialization, hospital, experience, isAvailable },
+            { name, email, phone, gender, age, address, bio, image, specialization, hospital, experience, isAvailable, qualification, consultationFee, registrationNumber, languages },
             { new: true, runValidators: true }
         );
 
@@ -243,15 +242,11 @@ exports.getPatientHistory = async (req, res) => {
     try {
         const patientId = req.params.id;
 
-        // Vitals
-        const vitals = await Vital.find({ patientId });
-
-        // History (Visits = Completed Appointments)
-        const visits = await Appointment.find({ patientId, status: { $in: ['completed', 'today'] } })
-            .sort({ _id: -1 });
-
-        // Documents
-        const documents = await Document.find({ patientId });
+        const [vitals, visits, documents] = await Promise.all([
+            Vital.find({ patientId }),
+            Appointment.find({ patientId, status: { $in: ['completed', 'today'] } }).sort({ _id: -1 }),
+            Document.find({ patientId })
+        ]);
 
         // Summary (Mock AI)
         const summary = `Patient has been under regular care. Recent vitals are stable.`;
@@ -282,6 +277,26 @@ exports.createPrescription = async (req, res) => {
             date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
         });
         res.status(201).json(prescription);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+// @desc    Create Appointment (by Doctor)
+// @route   POST /api/doctor/appointments
+exports.createAppointment = async (req, res) => {
+    try {
+        const { patientId, doctorId, date, time, type, mode, duration } = req.body;
+        const appointment = await Appointment.create({
+            patientId,
+            doctorId,
+            date,
+            time,
+            type,
+            mode,
+            duration: duration || '30 min',
+            status: 'upcoming'
+        });
+        res.status(201).json(appointment);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }

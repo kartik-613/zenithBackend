@@ -1,5 +1,5 @@
 const express = require('express');
-const { getPatientDashboard, getPatientAppointments, bookAppointment, getPatientPayments, getPatientProfile, updatePatientProfile, getPatientNotifications, markNotificationRead, deleteNotification, markAllNotificationsRead, getPatientVitals, addPatientVital, getPatientPrescriptions, getPatientDocuments, registerPatient } = require('../controllers/patientController');
+const { getPatientDashboard, getPatientAppointments, bookAppointment, getPatientPayments, getPatientProfile, updatePatientProfile, getPatientNotifications, markNotificationRead, deleteNotification, markAllNotificationsRead, getPatientVitals, addPatientVital, getPatientPrescriptions, getPatientDocuments, uploadDocument, registerPatient, rescheduleAppointment } = require('../controllers/patientController');
 const patientRoutes = express.Router();
 
 patientRoutes.get('/dashboard/:id', getPatientDashboard);
@@ -18,6 +18,9 @@ patientRoutes.post('/vitals/:id', addPatientVital);
 // New Routes
 patientRoutes.get('/prescriptions/:id', getPatientPrescriptions);
 patientRoutes.get('/documents/:id', getPatientDocuments);
+patientRoutes.post('/documents/:id', uploadDocument);
 patientRoutes.post('/register', registerPatient);
+patientRoutes.put('/reschedule/:id', rescheduleAppointment);
+patientRoutes.get('/test', (req, res) => res.json({ message: 'Patient routes are working' }));
 
 module.exports = patientRoutes;
