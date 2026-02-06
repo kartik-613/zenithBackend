@@ -13,6 +13,17 @@ const port = process.env.PORT || 3000;
 
 app.use(express.json());
 
+// Request logging middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  console.log(`${new Date().toISOString()} [${req.method}] ${req.originalUrl} - Started`);
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(`${new Date().toISOString()} [${req.method}] ${req.originalUrl} - ${res.statusCode} (${duration}ms)`);
+  });
+  next();
+});
+
 app.use("/api", mainRoutes);
 
 // Test route to verify server is alive
